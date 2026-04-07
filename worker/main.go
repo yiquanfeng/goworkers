@@ -1,4 +1,4 @@
-package worker
+package main
 
 import (
 	"bytes"
@@ -28,17 +28,10 @@ type workerResp struct {
 	ID uint `json:"id"`
 }
 
-func post(path string, body any) (*http.Response, error) {
-	data, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	return http.Post(masterURL+path, "application/json", bytes.NewReader(data))
-}
-
 func Register() {
 	hostname, _ := os.Hostname()
-	resp, err := post("/api/workers", map[string]string{"name": hostname})
+	data, _ := json.Marshal(map[string]string{"name": hostname})
+	resp, err := http.Post(masterURL+"/api/workers", "application/json", bytes.NewReader(data))
 	if err != nil {
 		fmt.Println("[worker] register failed:", err)
 		return
@@ -90,11 +83,16 @@ func GetNewTask() {
 
 func submitLog(taskID uint, level, message string) {
 	url := fmt.Sprintf("%s/api/workers/%d/logs", masterURL, workerID)
-	post(url, map[string]any{
+	data, _ := json.Marshal(map[string]any{
 		"task_id": taskID,
 		"level":   level,
 		"message": message,
 	})
+	resp, err := http.Post(url, "application/json", bytes.NewReader(data))
+	if err != nil {
+		return
+	}
+	resp.Body.Close()
 }
 
 func Execute(task Task) {
@@ -141,24 +139,32 @@ func completeTask(taskID uint) {
 	url := fmt.Sprintf("%s/api/workers/%d/tasks/%d/complete", masterURL, workerID, taskID)
 	resp, err := http.Post(url, "application/json", nil)
 	if err != nil {
-		fmt.Println("[worker] complete task failed:", err)
+		fmt.Printf("[worker] task id=%d complete request failed: %v\n", taskID, err)
 		return
 	}
-	resp.Body.Close()
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		fmt.Printf("[worker] task id=%d complete rejected by master: %s\n", taskID, resp.Status)
+	}
 }
 
 func failTask(taskID uint) {
 	url := fmt.Sprintf("%s/api/workers/%d/tasks/%d/fail", masterURL, workerID, taskID)
 	resp, err := http.Post(url, "application/json", nil)
 	if err != nil {
-		fmt.Println("[worker] fail task failed:", err)
+		fmt.Printf("[worker] task id=%d fail request failed: %v\n", taskID, err)
 		return
 	}
-	resp.Body.Close()
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		fmt.Printf("[worker] task id=%d fail rejected by master: %s\n", taskID, resp.Status)
+		return
+	}
+	fmt.Printf("[worker] task id=%d failed\n", taskID)
 }
 
-func Setup(master string) {
-	masterURL = master
+func main() {
+	masterURL = "http://localhost:8080"
 
 	// 1. 注册，拿到 workerID
 	Register()
