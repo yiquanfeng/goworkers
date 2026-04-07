@@ -11,6 +11,9 @@ import (
 func main() {
 	config.InitDB()
 	config.DB.AutoMigrate(&model.User{})
+	config.DB.AutoMigrate(&model.Worker{})
+	config.DB.AutoMigrate(&model.TaskLog{})
+	config.DB.AutoMigrate(&model.Task{})
 
 	r := gin.Default()
 	router.Setup(r)
