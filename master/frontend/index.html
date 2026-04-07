@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>go workers</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="login-page">
+  <div class="app-container">
+    <header class="header">
+      <span class="header-side blue-text">go workers</span>
+      <h1 class="header-title">go workers</h1>
+      <span class="header-side blue-text">go workers</span>
+    </header>
+
+    <main class="login-main">
+      <div class="login-side"></div>
+
+      <div class="login-form-wrapper">
+        <div id="error-msg" class="error-msg hidden"></div>
+
+        <input
+          id="identifier"
+          class="input-field"
+          type="text"
+          placeholder="username / email"
+        />
+        <input
+          id="password"
+          class="input-field"
+          type="password"
+          placeholder="password"
+        />
+
+        <div class="btn-row">
+          <button class="btn" id="login-btn">login</button>
+          <button class="btn" id="register-btn">register</button>
+        </div>
+
+        <div id="register-extra" class="register-extra hidden">
+          <input
+            id="reg-username"
+            class="input-field"
+            type="text"
+            placeholder="username"
+          />
+          <input
+            id="reg-email"
+            class="input-field"
+            type="email"
+            placeholder="email"
+          />
+          <button class="btn btn-primary" id="submit-register-btn">submit register</button>
+        </div>
+      </div>
+
+      <div class="login-side"></div>
+    </main>
+  </div>
+
+  <script>
+    const API = '';
+
+    const loginBtn = document.getElementById('login-btn');
+    const registerBtn = document.getElementById('register-btn');
+    const submitRegisterBtn = document.getElementById('submit-register-btn');
+    const registerExtra = document.getElementById('register-extra');
+    const errorMsg = document.getElementById('error-msg');
+
+    function showError(msg) {
+      errorMsg.textContent = msg;
+      errorMsg.classList.remove('hidden');
+    }
+    function hideError() {
+      errorMsg.classList.add('hidden');
+    }
+
+    loginBtn.addEventListener('click', async () => {
+      hideError();
+      const identifier = document.getElementById('identifier').value.trim();
+      const password = document.getElementById('password').value;
+
+      if (!identifier || !password) {
+        showError('please fill in all fields');
+        return;
+      }
+
+      try {
+        const res = await fetch(API + '/api/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ identifier, password }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          showError(data.error || 'login failed');
+          return;
+        }
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('username', data.user.username);
+        window.location.href = '/static/dashboard.html';
+      } catch (e) {
+        showError('network error');
+      }
+    });
+
+    registerBtn.addEventListener('click', () => {
+      hideError();
+      registerExtra.classList.toggle('hidden');
+    });
+
+    submitRegisterBtn.addEventListener('click', async () => {
+      hideError();
+      const username = document.getElementById('reg-username').value.trim();
+      const email = document.getElementById('reg-email').value.trim();
+      const password = document.getElementById('password').value;
+
+      if (!username || !email || !password) {
+        showError('please fill in all fields');
+        return;
+      }
+
+      try {
+        const res = await fetch(API + '/api/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, email, password }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          showError(data.error || 'register failed');
+          return;
+        }
+        showError('');
+        errorMsg.style.color = '#4a9eff';
+        errorMsg.textContent = 'registered! please login.';
+        errorMsg.classList.remove('hidden');
+        registerExtra.classList.add('hidden');
+      } catch (e) {
+        showError('network error');
+      }
+    });
+  </script>
+</body>
+</html>

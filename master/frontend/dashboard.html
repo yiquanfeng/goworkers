@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>go workers - dashboard</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="dashboard-page">
+  <div class="app-container">
+    <header class="header">
+      <span class="header-side"></span>
+      <h1 class="header-title">go workers</h1>
+      <div class="header-right">
+        <span class="blue-text" id="header-username"></span>
+        <button class="btn btn-sm" id="add-task-btn">+ new task</button>
+        <button class="btn btn-sm btn-outline" id="logout-btn">logout</button>
+      </div>
+    </header>
+
+    <main class="dashboard-main">
+      <div id="task-grid" class="task-grid">
+        <div class="task-card placeholder">loading...</div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Task Detail Modal -->
+  <div id="detail-overlay" class="modal-overlay hidden">
+    <div class="modal modal-wide">
+      <div class="detail-header">
+        <div>
+          <h2 class="modal-title" id="detail-name"></h2>
+          <span class="task-status-badge detail-status" id="detail-status"></span>
+        </div>
+        <button class="btn-icon" id="close-detail-btn" style="font-size:20px;">✕</button>
+      </div>
+
+      <div class="detail-meta">
+        <div class="meta-item">
+          <span class="meta-label">command</span>
+          <code class="meta-value" id="detail-command"></code>
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">scheduled at</span>
+          <span class="meta-value" id="detail-scheduled"></span>
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">assigned to worker</span>
+          <span class="meta-value" id="detail-worker"></span>
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">created at</span>
+          <span class="meta-value" id="detail-created"></span>
+        </div>
+      </div>
+
+      <div class="log-section">
+        <div class="log-section-title">task logs</div>
+        <div id="detail-logs" class="log-box">loading logs...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- New Task Modal -->
+  <div id="modal-overlay" class="modal-overlay hidden">
+    <div class="modal">
+      <h2 class="modal-title">new task</h2>
+      <input id="task-name" class="input-field" type="text" placeholder="task name" />
+      <input id="task-command" class="input-field" type="text" placeholder="command" />
+      <input id="task-scheduled" class="input-field" type="datetime-local" placeholder="scheduled at" />
+      <div class="btn-row">
+        <button class="btn btn-primary" id="submit-task-btn">create</button>
+        <button class="btn btn-outline" id="cancel-task-btn">cancel</button>
+      </div>
+      <div id="modal-error" class="error-msg hidden"></div>
+    </div>
+  </div>
+
+  <script>
+    const API = '';
+    const token = localStorage.getItem('token');
+    const username = localStorage.getItem('username');
+
+    if (!token) {
+      window.location.href = '/static/index.html';
+    }
+
+    document.getElementById('header-username').textContent = username || '';
+
+    function authHeaders() {
+      return {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + token,
+      };
+    }
+
+    function statusClass(status) {
+      switch (status) {
+        case 'pending': return 'status-pending';
+        case 'running': return 'status-running';
+        case 'done': return 'status-done';
+        case 'failed': return 'status-failed';
+        default: return '';
+      }
+    }
+
+    function formatDate(d) {
+      if (!d) return '';
+      return new Date(d).toLocaleString();
+    }
+
+    async function loadTasks() {
+      try {
+        const res = await fetch(API + '/api/tasks', { headers: authHeaders() });
+        if (res.status === 401) {
+          window.location.href = '/static/index.html';
+          return;
+        }
+        const tasks = await res.json();
+        renderTasks(tasks);
+      } catch (e) {
+        document.getElementById('task-grid').innerHTML = '<div class="task-card placeholder">failed to load tasks</div>';
+      }
+    }
+
+    function renderTasks(tasks) {
+      const grid = document.getElementById('task-grid');
+      if (!tasks || tasks.length === 0) {
+        grid.innerHTML = '<div class="task-card placeholder">no tasks yet — create one!</div>';
+        return;
+      }
+      grid.innerHTML = tasks.map(t => `
+        <div class="task-card ${statusClass(t.status)}" data-id="${t.ID}">
+          <div class="task-card-header">
+            <span class="task-name">${escHtml(t.name)}</span>
+            <span class="task-status-badge">${t.status}</span>
+          </div>
+          <div class="task-card-body">
+            <div class="task-command">${escHtml(t.command)}</div>
+          </div>
+          <div class="task-card-footer">
+            <span class="task-owner">${escHtml(username || '')}</span>
+            <button class="btn-icon btn-delete" data-id="${t.ID}" title="delete">✕</button>
+          </div>
+        </div>
+      `).join('');
+
+      grid.querySelectorAll('.btn-delete').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          const id = btn.dataset.id;
+          if (!confirm('delete this task?')) return;
+          await fetch(API + '/api/tasks/' + id, { method: 'DELETE', headers: authHeaders() });
+          loadTasks();
+        });
+      });
+
+      grid.querySelectorAll('.task-card').forEach(card => {
+        card.addEventListener('click', () => openDetail(card.dataset.id));
+      });
+    }
+
+    function escHtml(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    // Detail Modal
+    const detailOverlay = document.getElementById('detail-overlay');
+
+    document.getElementById('close-detail-btn').addEventListener('click', () => {
+      detailOverlay.classList.add('hidden');
+    });
+    detailOverlay.addEventListener('click', (e) => {
+      if (e.target === detailOverlay) detailOverlay.classList.add('hidden');
+    });
+
+    function levelClass(level) {
+      switch ((level || '').toUpperCase()) {
+        case 'ERROR': return 'log-error';
+        case 'WARN':  return 'log-warn';
+        default:      return 'log-info';
+      }
+    }
+
+    async function openDetail(id) {
+      detailOverlay.classList.remove('hidden');
+      document.getElementById('detail-logs').textContent = 'loading logs...';
+
+      const [taskRes, logsRes] = await Promise.all([
+        fetch(API + '/api/tasks/' + id, { headers: authHeaders() }),
+        fetch(API + '/api/tasks/' + id + '/logs', { headers: authHeaders() }),
+      ]);
+
+      const task = await taskRes.json();
+      document.getElementById('detail-name').textContent = task.name || '';
+      const statusEl = document.getElementById('detail-status');
+      statusEl.textContent = task.status || '';
+      statusEl.className = 'task-status-badge detail-status ' + statusClass(task.status);
+      document.getElementById('detail-command').textContent = task.command || '';
+      document.getElementById('detail-scheduled').textContent = formatDate(task.scheduled_at);
+      document.getElementById('detail-worker').textContent = task.assigned_to || '—';
+      document.getElementById('detail-created').textContent = formatDate(task.CreatedAt);
+
+      const logBox = document.getElementById('detail-logs');
+      if (!logsRes.ok) {
+        logBox.textContent = 'failed to load logs';
+        return;
+      }
+      const logs = await logsRes.json();
+      if (!logs || logs.length === 0) {
+        logBox.innerHTML = '<span class="log-empty">no logs yet</span>';
+        return;
+      }
+      logBox.innerHTML = logs.map(l => `
+        <div class="log-line ${levelClass(l.level)}">
+          <span class="log-level">${escHtml(l.level || 'INFO')}</span>
+          <span class="log-time">${formatDate(l.CreatedAt)}</span>
+          <span class="log-msg">${escHtml(l.message)}</span>
+        </div>
+      `).join('');
+      logBox.scrollTop = logBox.scrollHeight;
+    }
+
+    // Modal
+    const modalOverlay = document.getElementById('modal-overlay');
+    const modalError = document.getElementById('modal-error');
+
+    document.getElementById('add-task-btn').addEventListener('click', () => {
+      modalOverlay.classList.remove('hidden');
+      modalError.classList.add('hidden');
+    });
+
+    document.getElementById('cancel-task-btn').addEventListener('click', () => {
+      modalOverlay.classList.add('hidden');
+    });
+
+    modalOverlay.addEventListener('click', (e) => {
+      if (e.target === modalOverlay) modalOverlay.classList.add('hidden');
+    });
+
+    document.getElementById('submit-task-btn').addEventListener('click', async () => {
+      const name = document.getElementById('task-name').value.trim();
+      const command = document.getElementById('task-command').value.trim();
+      const scheduledRaw = document.getElementById('task-scheduled').value;
+
+      if (!name || !command || !scheduledRaw) {
+        modalError.textContent = 'all fields are required';
+        modalError.classList.remove('hidden');
+        return;
+      }
+
+      const scheduled_at = new Date(scheduledRaw).toISOString();
+
+      try {
+        const res = await fetch(API + '/api/tasks', {
+          method: 'POST',
+          headers: authHeaders(),
+          body: JSON.stringify({ name, command, scheduled_at }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          modalError.textContent = data.error || 'failed to create task';
+          modalError.classList.remove('hidden');
+          return;
+        }
+        modalOverlay.classList.add('hidden');
+        document.getElementById('task-name').value = '';
+        document.getElementById('task-command').value = '';
+        document.getElementById('task-scheduled').value = '';
+        loadTasks();
+      } catch (e) {
+        modalError.textContent = 'network error';
+        modalError.classList.remove('hidden');
+      }
+    });
+
+    document.getElementById('logout-btn').addEventListener('click', () => {
+      localStorage.clear();
+      window.location.href = '/static/index.html';
+    });
+
+    loadTasks();
+    // Auto-refresh every 10s
+    setInterval(loadTasks, 10000);
+  </script>
+</body>
+</html>

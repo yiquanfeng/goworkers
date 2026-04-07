@@ -7,6 +7,11 @@ import (
 )
 
 func Setup(r *gin.Engine) {
+	r.Static("/static", "./frontend")
+	r.GET("/", func(c *gin.Context) {
+		c.Redirect(302, "/static/index.html")
+	})
+
 	api := r.Group("/api")
 	{
 		api.POST("/register", handler.Register)
