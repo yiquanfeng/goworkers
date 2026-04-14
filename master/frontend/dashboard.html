@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>go workers - dashboard</title>
+  <title>go workers — dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Source+Code+Pro:wght@400;500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body class="dashboard-page">
@@ -12,9 +13,9 @@
       <span class="header-side"></span>
       <h1 class="header-title">go workers</h1>
       <div class="header-right">
-        <span class="blue-text" id="header-username"></span>
-        <button class="btn btn-sm" id="add-task-btn">+ new task</button>
-        <button class="btn btn-sm btn-outline" id="logout-btn">logout</button>
+        <span class="header-username" id="header-username"></span>
+        <button class="btn btn-header btn-sm" id="add-task-btn">[+] new task</button>
+        <button class="btn btn-header btn-sm" id="logout-btn">logout</button>
       </div>
     </header>
 
@@ -31,9 +32,9 @@
       <div class="detail-header">
         <div>
           <h2 class="modal-title" id="detail-name"></h2>
-          <span class="task-status-badge detail-status" id="detail-status"></span>
+          <span class="badge" id="detail-status"></span>
         </div>
-        <button class="btn-icon" id="close-detail-btn" style="font-size:20px;">✕</button>
+        <button class="btn-delete" id="close-detail-btn" style="font-size:13px;">[x]</button>
       </div>
 
       <div class="detail-meta">
@@ -56,7 +57,7 @@
       </div>
 
       <div class="log-section">
-        <div class="log-section-title">task logs</div>
+        <div class="log-section-title">// task logs</div>
         <div id="detail-logs" class="log-box">loading logs...</div>
       </div>
     </div>
@@ -66,14 +67,21 @@
   <div id="modal-overlay" class="modal-overlay hidden">
     <div class="modal">
       <h2 class="modal-title">new task</h2>
-      <input id="task-name" class="input-field" type="text" placeholder="task name" />
-      <input id="task-command" class="input-field" type="text" placeholder="command" />
-      <input id="task-scheduled" class="input-field" type="datetime-local" placeholder="scheduled at" />
+
+      <label class="form-label" for="task-name">task name</label>
+      <input id="task-name" class="input" type="text" placeholder="task name" />
+
+      <label class="form-label" for="task-command">command</label>
+      <input id="task-command" class="input" type="text" placeholder="command" />
+
+      <label class="form-label" for="task-scheduled">scheduled at</label>
+      <input id="task-scheduled" class="input" type="datetime-local" />
+
       <div class="btn-row">
         <button class="btn btn-primary" id="submit-task-btn">create</button>
-        <button class="btn btn-outline" id="cancel-task-btn">cancel</button>
+        <button class="btn btn-secondary" id="cancel-task-btn">cancel</button>
       </div>
-      <div id="modal-error" class="error-msg hidden"></div>
+      <div id="modal-error" class="msg msg-error hidden"></div>
     </div>
   </div>
 
@@ -95,13 +103,13 @@
       };
     }
 
-    function statusClass(status) {
+    function statusBadgeClass(status) {
       switch (status) {
-        case 'pending': return 'status-pending';
-        case 'running': return 'status-running';
-        case 'done': return 'status-done';
-        case 'failed': return 'status-failed';
-        default: return '';
+        case 'pending': return 'badge badge-pending';
+        case 'running': return 'badge badge-running';
+        case 'done':    return 'badge badge-done';
+        case 'failed':  return 'badge badge-failed';
+        default:        return 'badge badge-muted';
       }
     }
 
@@ -120,28 +128,28 @@
         const tasks = await res.json();
         renderTasks(tasks);
       } catch (e) {
-        document.getElementById('task-grid').innerHTML = '<div class="task-card placeholder">failed to load tasks</div>';
+        document.getElementById('task-grid').innerHTML = '<div class="task-card placeholder">[-] failed to load tasks</div>';
       }
     }
 
     function renderTasks(tasks) {
       const grid = document.getElementById('task-grid');
       if (!tasks || tasks.length === 0) {
-        grid.innerHTML = '<div class="task-card placeholder">no tasks yet — create one!</div>';
+        grid.innerHTML = '<div class="task-card placeholder">// no tasks yet — create one</div>';
         return;
       }
       grid.innerHTML = tasks.map(t => `
-        <div class="task-card ${statusClass(t.status)}" data-id="${t.ID}">
+        <div class="task-card" data-id="${t.ID}">
           <div class="task-card-header">
             <span class="task-name">${escHtml(t.name)}</span>
-            <span class="task-status-badge">${t.status}</span>
+            <span class="${statusBadgeClass(t.status)}">${t.status}</span>
           </div>
           <div class="task-card-body">
             <div class="task-command">${escHtml(t.command)}</div>
           </div>
           <div class="task-card-footer">
             <span class="task-owner">${escHtml(username || '')}</span>
-            <button class="btn-icon btn-delete" data-id="${t.ID}" title="delete">✕</button>
+            <button class="btn-delete" data-id="${t.ID}" title="delete">[x]</button>
           </div>
         </div>
       `).join('');
@@ -200,7 +208,7 @@
       document.getElementById('detail-name').textContent = task.name || '';
       const statusEl = document.getElementById('detail-status');
       statusEl.textContent = task.status || '';
-      statusEl.className = 'task-status-badge detail-status ' + statusClass(task.status);
+      statusEl.className = statusBadgeClass(task.status);
       document.getElementById('detail-command').textContent = task.command || '';
       document.getElementById('detail-scheduled').textContent = formatDate(task.scheduled_at);
       document.getElementById('detail-worker').textContent = task.assigned_to || '—';
@@ -208,12 +216,12 @@
 
       const logBox = document.getElementById('detail-logs');
       if (!logsRes.ok) {
-        logBox.textContent = 'failed to load logs';
+        logBox.textContent = '[-] failed to load logs';
         return;
       }
       const logs = await logsRes.json();
       if (!logs || logs.length === 0) {
-        logBox.innerHTML = '<span class="log-empty">no logs yet</span>';
+        logBox.innerHTML = '<span class="log-empty">// no logs yet</span>';
         return;
       }
       logBox.innerHTML = logs.map(l => `
@@ -226,7 +234,7 @@
       logBox.scrollTop = logBox.scrollHeight;
     }
 
-    // Modal
+    // New Task Modal
     const modalOverlay = document.getElementById('modal-overlay');
     const modalError = document.getElementById('modal-error');
 
@@ -285,7 +293,6 @@
     });
 
     loadTasks();
-    // Auto-refresh every 10s
     setInterval(loadTasks, 10000);
   </script>
 </body>

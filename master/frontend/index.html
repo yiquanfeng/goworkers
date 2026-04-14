@@ -4,50 +4,56 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>go workers</title>
+  <link href="https://fonts.googleapis.com/css2?family=Source+Code+Pro:wght@400;500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body class="login-page">
   <div class="app-container">
     <header class="header">
-      <span class="header-side blue-text">go workers</span>
+      <span class="header-side">go workers</span>
       <h1 class="header-title">go workers</h1>
-      <span class="header-side blue-text">go workers</span>
+      <span class="header-side" style="text-align:right;">go workers</span>
     </header>
 
     <main class="login-main">
       <div class="login-side"></div>
 
       <div class="login-form-wrapper">
-        <div id="error-msg" class="error-msg hidden"></div>
+        <div id="feedback-msg" class="msg msg-error hidden"></div>
 
+        <label class="form-label" for="identifier">username / email</label>
         <input
           id="identifier"
-          class="input-field"
+          class="input"
           type="text"
-          placeholder="username / email"
+          placeholder="username or email"
         />
+
+        <label class="form-label" for="password">password</label>
         <input
           id="password"
-          class="input-field"
+          class="input"
           type="password"
           placeholder="password"
         />
 
         <div class="btn-row">
-          <button class="btn" id="login-btn">login</button>
-          <button class="btn" id="register-btn">register</button>
+          <button class="btn btn-primary" id="login-btn">login</button>
+          <button class="btn btn-secondary" id="register-btn">register</button>
         </div>
 
         <div id="register-extra" class="register-extra hidden">
+          <label class="form-label" for="reg-username">username</label>
           <input
             id="reg-username"
-            class="input-field"
+            class="input"
             type="text"
             placeholder="username"
           />
+          <label class="form-label" for="reg-email">email</label>
           <input
             id="reg-email"
-            class="input-field"
+            class="input"
             type="email"
             placeholder="email"
           />
@@ -66,18 +72,22 @@
     const registerBtn = document.getElementById('register-btn');
     const submitRegisterBtn = document.getElementById('submit-register-btn');
     const registerExtra = document.getElementById('register-extra');
-    const errorMsg = document.getElementById('error-msg');
+    const feedbackMsg = document.getElementById('feedback-msg');
 
     function showError(msg) {
-      errorMsg.textContent = msg;
-      errorMsg.classList.remove('hidden');
+      feedbackMsg.textContent = msg;
+      feedbackMsg.className = 'msg msg-error';
     }
-    function hideError() {
-      errorMsg.classList.add('hidden');
+    function showSuccess(msg) {
+      feedbackMsg.textContent = msg;
+      feedbackMsg.className = 'msg msg-success';
+    }
+    function hideMsg() {
+      feedbackMsg.className = 'msg msg-error hidden';
     }
 
     loginBtn.addEventListener('click', async () => {
-      hideError();
+      hideMsg();
       const identifier = document.getElementById('identifier').value.trim();
       const password = document.getElementById('password').value;
 
@@ -106,12 +116,12 @@
     });
 
     registerBtn.addEventListener('click', () => {
-      hideError();
+      hideMsg();
       registerExtra.classList.toggle('hidden');
     });
 
     submitRegisterBtn.addEventListener('click', async () => {
-      hideError();
+      hideMsg();
       const username = document.getElementById('reg-username').value.trim();
       const email = document.getElementById('reg-email').value.trim();
       const password = document.getElementById('password').value;
@@ -132,10 +142,7 @@
           showError(data.error || 'register failed');
           return;
         }
-        showError('');
-        errorMsg.style.color = '#4a9eff';
-        errorMsg.textContent = 'registered! please login.';
-        errorMsg.classList.remove('hidden');
+        showSuccess('[+] registered — please login.');
         registerExtra.classList.add('hidden');
       } catch (e) {
         showError('network error');
